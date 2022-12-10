@@ -46,6 +46,7 @@ type
     StringColumn3: TStringColumn;
     PreviewsColumn: TImageColumn;
     StatusBar: TStatusBar;
+    ProgressBar: TProgressBar;
     procedure CatalogListHeaderClick(Column: TColumn);
     procedure FormCreate(Sender: TObject);
     procedure CatalogListGetValue(Sender: TObject; const Col, Row: Integer;
@@ -62,11 +63,12 @@ type
     CatalogDir:string;
     CatalogListData:TList<TRowData>;
     preview_bmp:TBitmap;
-    procedure LoadCatalogList(Sender:TObject);
   end;
 
 var
   MainForm: TMainForm;
+
+procedure LoadCatalogList;
 
 implementation
 
@@ -89,10 +91,11 @@ preview_bmp:=TBitmap.Create;
 preview_bmp.LoadFromStream(RStream);
 RStream.Free;
 CatalogListData:=TList<TRowData>.Create;
+CatalogList.RowCount:=0;
 with TThread.CreateAnonymousThread(
   procedure
   begin
-  MainForm.LoadCatalogList(self);
+  LoadCatalogList;
   end) do begin
     FreeOnTerminate:=true;
     Start;
@@ -115,7 +118,12 @@ except
 end;
 end;
 
-procedure TMainForm.LoadCatalogList(Sender: TObject);
+procedure ProgressBarHide;
+begin
+MainForm.ProgressBar.Visible:=false;
+end;
+
+procedure LoadCatalogList;
 var
   SearchRec: TSearchRec;
   FileName:string;
@@ -128,19 +136,19 @@ begin
   FileName := '*.*';
   SL:=TStringList.Create;
   SL.Delimiter:='_';
-  CatalogDir:='D:/lightroom catalogs';
-  CatalogList.RowCount:=0;
+  MainForm.CatalogDir:='D:/lightroom catalogs';
+  MainForm.CatalogList.RowCount:=0;
 
-  if FindFirst(CatalogDir+'/*.*', faDirectory	,SearchRec) = 0 then
+  if FindFirst(MainForm.CatalogDir+'/*.*', faDirectory	,SearchRec) = 0 then
   repeat
     if ((SearchRec.Attr and faDirectory) = SearchRec.Attr)and(SearchRec.Name<>'.')and(SearchRec.Name<>'..') then
     begin
-      row.id:=CatalogListData.Count;
+      row.id:=MainForm.CatalogListData.Count;
       row.Name:=SearchRec.Name;
-      row.Previews:=DirectoryExists(CatalogDir+'/'+SearchRec.Name+'/'+ SearchRec.Name+' Previews.lrdata');
+      row.Previews:=DirectoryExists(MainForm.CatalogDir+'/'+SearchRec.Name+'/'+ SearchRec.Name+' Previews.lrdata');
       row.size:=0;
       if row.Previews then begin
-          TGetFolderSizeThread.Create(row.id,CatalogDir+'/'+SearchRec.Name+'/'+ SearchRec.Name+' Previews.lrdata');
+          TGetFolderSizeThread.Create(row.id,MainForm.CatalogDir+'/'+SearchRec.Name+'/'+ SearchRec.Name+' Previews.lrdata');
         end;
       SL.DelimitedText:=Trim(SearchRec.Name);
       row.Date:='';
@@ -155,13 +163,23 @@ begin
             end;
           end;
         end;
-      CatalogListData.Add(row);
-      //CatalogList.RowCount:=CatalogList.RowCount+1;
+      TThread.Synchronize(TThread.CurrentThread,
+                    procedure
+                    begin
+                      MainForm.CatalogListData.Add(row);
+                      MainForm.ProgressBar.Value:=MainForm.ProgressBar.Value+0.5;
+                    end);
     end;
   until FindNext(SearchRec) <> 0;
 
   SL.Free;
-  CatalogList.RowCount:=CatalogListData.Count;
+
+  TThread.Synchronize(TThread.CurrentThread,
+                procedure
+                begin
+                  MainForm.CatalogList.RowCount:=MainForm.CatalogListData.Count;
+                  MainForm.ProgressBar.Visible:=false;
+                end);
 end;
 
 procedure TMainForm.CatalogListGetValue(Sender: TObject; const Col,
