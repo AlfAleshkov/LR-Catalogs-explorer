@@ -237,7 +237,6 @@ end;
 
 procedure TMainForm.CatalogListSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
-var i:integer;
 begin
 end;
 
@@ -257,13 +256,11 @@ procedure TGetFolderSizeThread.Done;
 var
   row:TRowData;
   i:word;
-  p:TProgressCell;
 begin
   for i:=0 to MainForm.CatalogListData.Count do
     if MainForm.CatalogListData[i].id=findex then begin
       row:=MainForm.CatalogListData[i];
       fsize:=fsize div 1048576; //Translate in MB's, 1048576 = 1204x1024
-      //row.Date:=IntToStr(fsize);
       row.Size:=fsize;
       MainForm.CatalogListData[i]:=row;
       break;
@@ -289,9 +286,6 @@ end;
 
 { TCustomColumn }
 
-
-{ TCustomColumn }
-
 procedure TCustomColumn.DefaultDrawCell(const Canvas: TCanvas;
   const Bounds: TRectF; const Row: Integer; const Value: TValue;
   const State: TGridDrawStates);
@@ -302,10 +296,14 @@ begin
   R := Bounds;
   R.Inflate(2, -5);
   R.Width:=Value.AsInt64/MaxValue*R.Width;
-  Canvas.Fill.Color:=$FFAAAADD;
-  Canvas.FillRect(R,0,0,[],0.5);
-  if Value.AsInt64>0 then
-    s:=Value.ToString+' Mb' else s:='';
+  if R.Width>6 then begin
+    Canvas.Fill.Color:=$FFAAAADD;
+    if Value.AsInt64/MaxValue>0.5 then Canvas.Fill.Color:=$FFDDAA99;
+    Canvas.FillRect(R,4,4,AllCorners,Value.AsInt64/MaxValue);
+    end;
+  s:='';
+  if Value.AsInt64>0 then s:=Value.ToString+' Mb';
+  if Value.AsInt64>999 then s:=formatfloat('0.00',Value.AsInt64/1000)+' Gb';
   inherited DefaultDrawCell(Canvas,Bounds,Row,TValue(s),State)
   //Value.
   //Value:=TValue('sda');
